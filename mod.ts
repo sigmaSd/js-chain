@@ -11,7 +11,9 @@ export type Safe<T> =
     /** Returns the underlying value if no error occurred, otherwise returns the fallback. */
     or(fallback: T): T;
     /** Returns the underlying value or exits the process with the given message if an error occurred. */
-    must(msg: string): Safe<T>;
+    must(msg: string, verbose?: boolean): Safe<T>;
+    /** Returns the underlying value or exits the process with the given message if an error occurred. Terminal. */
+    expect(msg: string, verbose?: boolean): T;
     /** Chains a transformation function. */
     pipe<U>(fn: (val: T) => U): Safe<U>;
     /** Chains a side-effect. Returns the original Safe wrapper. */
@@ -52,13 +54,25 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
 
       // 3. Chain: Exit on failure
       if (prop === "must") {
-        return (msg: string) => {
+        return (msg: string, verbose = false) => {
           if (isErr) {
             console.error(`\x1b[31m${msg}\x1b[0m`);
-            if (error) console.error(error);
+            if (verbose && error) console.error(error);
             Deno.exit(1);
           }
           return _(val);
+        };
+      }
+
+      // 3.5 Terminal: Exit on failure
+      if (prop === "expect") {
+        return (msg: string, verbose = true) => {
+          if (isErr) {
+            console.error(`\x1b[31m${msg}\x1b[0m`);
+            if (verbose && error) console.error(error);
+            Deno.exit(1);
+          }
+          return val;
         };
       }
 
