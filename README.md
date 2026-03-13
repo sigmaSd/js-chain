@@ -57,7 +57,9 @@ console.log(`Port: ${port}`);
 **Traditional `if` checks:**
 
 ```typescript
-const user = await Promise.resolve({ profile: { getName: () => "user" } });
+const user = await Promise.resolve({
+  profile: { getName: () => "user" as string },
+});
 let name = "Anonymous";
 
 if (user && user.profile && user.profile.getName) {
@@ -73,7 +75,9 @@ if (user && user.profile && user.profile.getName) {
 
 ```typescript
 import { _ } from "@sigma/chain";
-const user: any = null;
+const user = await Promise.resolve({
+  profile: { getName: () => "user" as string },
+});
 const name = _(user)
   .profile
   .getName()
