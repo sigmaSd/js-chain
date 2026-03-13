@@ -9,9 +9,8 @@ const version = _("jsr.json")
   .expect("Version not found");
 console.log(`Version: ${version}`);
 
-// 2. Error Recovery with .or() (Type-Safe with cast for missing prop)
-// deno-lint-ignore no-explicit-any
-const author = (_({ name: "sigma" }) as any)
+// 2. Error Recovery with .or() (Type-Safe navigation)
+const author = _({ name: "sigma" })
   .author
   .name
   .or("Anonymous");
@@ -42,9 +41,8 @@ const config = _({ port: 8080 })
   .unwrap();
 console.log(`Port: ${config}`);
 
-// 6. Runtime Safety Demo (Explicit cast for "magic" navigation)
-// deno-lint-ignore no-explicit-any
-const missing = (_(null) as any)
+// 6. Runtime Safety Demo ("Magic" navigation)
+const missing = _(null)
   .nonExistent
   .methodCall()
   .or("Default Value");

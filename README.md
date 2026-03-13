@@ -74,7 +74,7 @@ if (user && user.profile && user.profile.getName) {
 ```typescript
 import { _ } from "@sigma/chain";
 
-const name = (_(user) as any)
+const name = _(user)
   .profile
   .getName()
   .or("Anonymous");

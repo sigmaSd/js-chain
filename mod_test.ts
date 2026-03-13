@@ -1,17 +1,16 @@
+// deno-lint-ignore-file no-explicit-any
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0.19";
 import { _ } from "./mod.ts";
 
 Deno.test("Safe property access - success", () => {
   const obj = { a: { b: { c: 1 } } };
-  // deno-lint-ignore no-explicit-any
-  const result = (_(obj) as any).a.b.c.unwrap();
+  const result = _(obj).a.b.c.unwrap();
   assertEquals(result, 1);
 });
 
 Deno.test("Safe property access - failure (null/undefined)", () => {
   const obj = { a: { b: null } };
-  // deno-lint-ignore no-explicit-any
-  const result = (_(obj) as any).a.b.c.or(100);
+  const result = _(obj).a.b.c.or(100);
   assertEquals(result, 100);
 });
 
@@ -19,15 +18,13 @@ Deno.test("Safe function call - success", () => {
   const obj = {
     greet: (name: string) => `Hello, ${name}!`,
   };
-  // deno-lint-ignore no-explicit-any
-  const result = (_(obj) as any).greet("World").unwrap();
+  const result = _(obj).greet("World").unwrap();
   assertEquals(result, "Hello, World!");
 });
 
 Deno.test("Safe function call - failure", () => {
   const obj = {};
-  // deno-lint-ignore no-explicit-any
-  const result = (_(obj) as any).missing().or("fallback");
+  const result = _(obj).missing().or("fallback");
   assertEquals(result, "fallback");
 });
 
@@ -95,7 +92,6 @@ Deno.test("log() does not throw", () => {
 });
 
 Deno.test("Regression: 'name' property on any result (like JSON.parse)", () => {
-  // deno-lint-ignore no-explicit-any
   const val = _({ name: "my-package" } as any);
   // .name should be Chain<any>, which has .unwrap()
   const result = val.name.unwrap();
@@ -103,10 +99,17 @@ Deno.test("Regression: 'name' property on any result (like JSON.parse)", () => {
 });
 
 Deno.test("Regression: 'length' property on any result", () => {
-  // deno-lint-ignore no-explicit-any
   const val = _({ length: 42 } as any);
   const result = val.length.unwrap();
   assertEquals(result, 42);
+});
+
+Deno.test("Regression: 'name' and 'length' property on function result", () => {
+  const val = _((() => {}) as any);
+  // Functions have built-in name and length, which were shadowed by string/number.
+  // They should now be Chain<any>.
+  assertEquals(typeof val.name.unwrap(), "string");
+  assertEquals(typeof val.length.unwrap(), "number");
 });
 
 Deno.test("Deep chaining with errors", () => {
@@ -115,7 +118,19 @@ Deno.test("Deep chaining with errors", () => {
       throw new Error("Deep Error");
     },
   };
-  // deno-lint-ignore no-explicit-any
-  const result = (_(obj) as any).a().b.c.or("failed");
+  const result = _(obj).a().b.c.or("failed");
   assertEquals(result, "failed");
+});
+
+Deno.test("Async property access", async () => {
+  const p = Promise.resolve({ user: { name: "alice" } });
+  const name = await _(p).user.name.unwrap();
+  assertEquals(name, "alice");
+});
+
+Deno.test("Deep object navigation failure (no 'as any')", () => {
+  const obj = { a: { b: 1 } };
+  // @ts-ignore: testing magic navigation
+  const val = _(obj).a.b.c.d.or(100);
+  assertEquals(val, 100);
 });
