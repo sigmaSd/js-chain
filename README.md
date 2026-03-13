@@ -88,6 +88,14 @@ const name = _(user)
 deno add jsr:@sigma/chain
 ```
 
+```bash
+npx jsr add @sigma/chain
+```
+
+```bash
+bunx jsr add @sigma/chain
+```
+
 ### Basic Example
 
 ```typescript
