@@ -1,6 +1,8 @@
 {
   "name": "@sigma/chain",
   "exports": "./mod.ts",
+  "version": "0.1.0",
+  "license": "MIT",
   "imports": {
     "@std/assert": "jsr:@std/assert@^1.0.19"
   },
