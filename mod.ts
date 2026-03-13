@@ -2,7 +2,14 @@
  * A "magic" wrapper that provides safe navigation and utility methods.
  */
 // deno-lint-ignore-file no-explicit-any
-import process from "node:process";
+
+/** Error thrown when a chain assertion fails (must/expect). */
+export class ChainAssertionError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ChainAssertionError";
+  }
+}
 
 type IsAny<T> = 0 extends (1 & T) ? true : false;
 
@@ -21,9 +28,9 @@ export type ChainUtils<T> = {
   or(
     fallback: Awaited<T>,
   ): T extends Promise<any> ? Promise<Awaited<T>> : Awaited<T>;
-  /** Returns the underlying value or exits the process with the given message if an error occurred. */
+  /** Returns the underlying value or throws ChainAssertionError with the given message if an error occurred. */
   must(msg: string, verbose?: boolean): Chain<T>;
-  /** Returns the underlying value or exits the process with the given message if an error occurred. Terminal. */
+  /** Returns the underlying value or throws ChainAssertionError with the given message if an error occurred. Terminal. */
   expect(
     msg: string,
     verbose?: boolean,
@@ -139,21 +146,27 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
             return _(
               (value as Promise<any>).then((v) => {
                 if (v === null || v === undefined) {
-                  console.error(`\x1b[31m${msg}\x1b[0m`);
-                  process.exit(1);
+                  throw new ChainAssertionError(msg);
                 }
                 return v;
               }).catch((err) => {
-                console.error(`\x1b[31m${msg}\x1b[0m`);
-                if (verbose) console.error(err);
-                process.exit(1);
+                if (verbose) {
+                  console.error(`\x1b[31m${msg}\x1b[0m`);
+                  if (err && !(err instanceof ChainAssertionError)) {
+                    console.error(err);
+                  }
+                }
+                if (err instanceof ChainAssertionError) throw err;
+                throw new ChainAssertionError(msg, { cause: err });
               }),
             );
           }
           if (hasAnyError) {
-            console.error(`\x1b[31m${msg}\x1b[0m`);
-            if (verbose && error) console.error(error);
-            process.exit(1);
+            if (verbose) {
+              console.error(`\x1b[31m${msg}\x1b[0m`);
+              if (error) console.error(error);
+            }
+            throw new ChainAssertionError(msg, { cause: error });
           }
           return _(value);
         };
@@ -163,20 +176,27 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
           if (isPromise) {
             return (value as Promise<any>).then((v) => {
               if (v === null || v === undefined) {
-                console.error(`\x1b[31m${msg}\x1b[0m`);
-                process.exit(1);
+                if (verbose) console.error(`\x1b[31m${msg}\x1b[0m`);
+                throw new ChainAssertionError(msg);
               }
               return v;
             }).catch((err) => {
-              console.error(`\x1b[31m${msg}\x1b[0m`);
-              if (verbose) console.error(err);
-              process.exit(1);
+              if (verbose) {
+                console.error(`\x1b[31m${msg}\x1b[0m`);
+                if (err && !(err instanceof ChainAssertionError)) {
+                  console.error(err);
+                }
+              }
+              if (err instanceof ChainAssertionError) throw err;
+              throw new ChainAssertionError(msg, { cause: err });
             });
           }
           if (hasAnyError) {
-            console.error(`\x1b[31m${msg}\x1b[0m`);
-            if (verbose && error) console.error(error);
-            process.exit(1);
+            if (verbose) {
+              console.error(`\x1b[31m${msg}\x1b[0m`);
+              if (error) console.error(error);
+            }
+            throw new ChainAssertionError(msg, { cause: error });
           }
           return value;
         };

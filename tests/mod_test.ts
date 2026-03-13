@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0.19";
-import { _, IS_CHAIN, isChain } from "./mod.ts";
+import { _, IS_CHAIN, isChain } from "../mod.ts";
 
 Deno.test("isChain() type guard", () => {
   const wrapped = _({ a: 1 });
