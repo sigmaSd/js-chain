@@ -5,16 +5,22 @@
 
 /** Error thrown when a chain assertion fails (must/expect). */
 export class ChainAssertionError extends Error {
+  /**
+   * Constructs a new ChainAssertionError.
+   * @param message The error message.
+   * @param options Optional error options, such as the cause.
+   */
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "ChainAssertionError";
   }
 }
 
-type IsAny<T> = 0 extends (1 & T) ? true : false;
+/** Utility type to determine if a given type is exactly `any`. */
+export type IsAny<T> = 0 extends (1 & T) ? true : false;
 
 /** Internal symbol to identify Chain instances. */
-export const IS_CHAIN = Symbol.for("@sigma/chain/isChain");
+export const IS_CHAIN: symbol = Symbol.for("@sigma/chain/isChain");
 
 /** Returns true if the value is a Chain wrapper. */
 export function isChain(val: any): val is Chain<any> {
