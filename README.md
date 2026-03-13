@@ -1,4 +1,4 @@
-# @sigma/pipe
+# @sigma/chain
 
 A "magic" wrapper for safe navigation, error handling, and functional chaining
 in TypeScript.
@@ -19,7 +19,7 @@ fallbacks, and functional transformations in a single chain.
 - **Explicit Termination**: Use `.unwrap()`, `.must()`, or `.expect()` to get
   the value or handle failure.
 
-## Comparison: Traditional vs. @sigma/pipe
+## Comparison: Traditional vs. @sigma/chain
 
 ### Deep Object Navigation & Error Handling
 
@@ -38,10 +38,10 @@ try {
 console.log(`Port: ${port}`);
 ```
 
-**With `@sigma/pipe`:**
+**With `@sigma/chain`:**
 
 ```typescript
-import { _ } from "@sigma/pipe";
+import { _ } from "@sigma/chain";
 
 const port = _("config.json")
   .pipe(Deno.readTextFileSync)
@@ -69,10 +69,10 @@ if (user && user.profile && user.profile.getName) {
 }
 ```
 
-**With `@sigma/pipe`:**
+**With `@sigma/chain`:**
 
 ```typescript
-import { _ } from "@sigma/pipe";
+import { _ } from "@sigma/chain";
 
 const name = (_(user) as any)
   .profile
@@ -85,13 +85,13 @@ const name = (_(user) as any)
 ### Installation
 
 ```bash
-deno add jsr:@sigma/pipe
+deno add jsr:@sigma/chain
 ```
 
 ### Basic Example
 
 ```typescript
-import { _ } from "@sigma/pipe";
+import { _ } from "@sigma/chain";
 
 const result = _({ a: { b: 1 } })
   .a.b

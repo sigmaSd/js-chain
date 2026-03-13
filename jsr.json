@@ -1,5 +1,5 @@
 {
-  "name": "@sigma/pipe",
+  "name": "@sigma/chain",
   "version": "0.1.0",
   "exports": "./mod.ts",
   "license": "MIT"
