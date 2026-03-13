@@ -2,11 +2,14 @@
  * A "magic" wrapper that provides safe navigation and utility methods.
  */
 export type Safe<T> =
+  // 1. If the value is a function, the wrapper is callable.
   // deno-lint-ignore no-explicit-any
   & (T extends (...args: any[]) => any
     ? (...args: Parameters<T>) => Safe<ReturnType<T>>
     : unknown)
+  // 2. Map existing properties of T to Safe versions.
   & { [K in keyof T]: Safe<T[K]> }
+  // 3. Utility methods.
   & {
     /** Returns the underlying value if no error occurred, otherwise returns the fallback. */
     or(fallback: T): T;
@@ -31,17 +34,11 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
   const isErr = error !== undefined || val === undefined || val === null;
 
   // Use a dummy function as the target to make the Proxy callable.
-  // The actual logic is handled in the 'get' and 'apply' traps.
   const target = (() => {}) as unknown as Safe<T>;
 
   return new Proxy(target, {
     get(_target, prop) {
-      // 1. Terminal: Extract value with a fallback
-      if (prop === "or") {
-        return (fallback: T) => isErr ? fallback : val;
-      }
-
-      // 2. Terminal: Extract value or throw
+      if (prop === "or") return (fallback: T) => isErr ? fallback : val;
       if (prop === "unwrap") {
         return () => {
           if (isErr) {
@@ -51,8 +48,6 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
           return val;
         };
       }
-
-      // 3. Chain: Exit on failure
       if (prop === "must") {
         return (msg: string, verbose = false) => {
           if (isErr) {
@@ -63,8 +58,6 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
           return _(val);
         };
       }
-
-      // 3.5 Terminal: Exit on failure
       if (prop === "expect") {
         return (msg: string, verbose = true) => {
           if (isErr) {
@@ -75,8 +68,6 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
           return val;
         };
       }
-
-      // 4. Chain: Custom transformation
       if (prop === "pipe") {
         return <U>(fn: (v: T) => U) => {
           if (isErr) return _(undefined as unknown as U, error);
@@ -87,8 +78,6 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
           }
         };
       }
-
-      // 4. Chain: Side effect
       if (prop === "tap") {
         return (fn: (v: T) => void) => {
           if (isErr) return _(val, error);
@@ -100,8 +89,6 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
           }
         };
       }
-
-      // 5. Chain: Logging
       if (prop === "log") {
         return (prefix?: string) => {
           if (isErr) {
@@ -116,7 +103,6 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
         };
       }
 
-      // 6. Chain: Property access
       if (isErr) {
         return _(
           undefined as unknown as T,
@@ -132,7 +118,6 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
       try {
         // deno-lint-ignore no-explicit-any
         const next = (val as any)[prop];
-        // If the property is a function, bind it to preserve 'this'
         return typeof next === "function" ? _(next.bind(val)) : _(next);
       } catch (e) {
         return _(undefined as unknown as T, e);
