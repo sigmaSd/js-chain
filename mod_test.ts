@@ -102,16 +102,34 @@ Deno.test("tap() executes side effect and returns same wrapper", () => {
   assertEquals(result, 10);
 });
 
-Deno.test("tap() catches errors and preserves value", () => {
+Deno.test("tap() catches errors and triggers fallback", () => {
   const result = _(10)
     .tap((_n: number) => {
       throw new Error("Tap Error");
     });
 
-  // Value should still be 10
-  assertEquals(result.or(0), 10);
-  // But unwrap should throw the Tap Error
+  // Value should be fallback because chain has error
+  assertEquals(result.or(0), 0);
+  // unwrap should still throw the Tap Error
   assertThrows(() => result.unwrap(), Error, "Tap Error");
+});
+
+Deno.test("tap() error handling consistency (sync vs async)", async () => {
+  // Sync
+  const syncResult = _(10)
+    .tap(() => {
+      throw new Error("Tap Error");
+    })
+    .or(0);
+  assertEquals(syncResult, 0);
+
+  // Async
+  const asyncResult = await _(Promise.resolve(10))
+    .tap(() => {
+      throw new Error("Tap Error");
+    })
+    .or(0);
+  assertEquals(asyncResult, 0);
 });
 
 Deno.test("log() does not throw and handles different states", () => {

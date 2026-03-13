@@ -92,7 +92,6 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
   const hasValue = value !== undefined && value !== null;
   // A chain is considered "failed" if it has no value (is null/undefined).
   // This affects or().
-  const isFailed = !hasValue;
   // unwrap() should throw if there is ANY error or no value.
   const hasAnyError = error !== undefined || !hasValue;
 
@@ -114,7 +113,7 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
             )
               .catch(() => fallback);
           }
-          return isFailed ? fallback : value;
+          return hasAnyError ? fallback : value;
         };
       }
       if (prop === "unwrap") {
