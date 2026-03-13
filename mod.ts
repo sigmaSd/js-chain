@@ -2,31 +2,52 @@
  * A "magic" wrapper that provides safe navigation and utility methods.
  */
 import process from "node:process";
+
+type IsAny<T> = 0 extends (1 & T) ? true : false;
+
+// deno-lint-ignore ban-types
+type NativeFunction = Function;
+
+/** Utility methods for the Chain wrapper. */
+export type ChainUtils<T> = {
+  /** Returns the underlying value if no error occurred, otherwise returns the fallback. */
+  or(fallback: T): T;
+  /** Returns the underlying value or exits the process with the given message if an error occurred. */
+  must(msg: string, verbose?: boolean): Chain<T>;
+  /** Returns the underlying value or exits the process with the given message if an error occurred. Terminal. */
+  expect(msg: string, verbose?: boolean): T;
+  /** Chains a transformation function. */
+  pipe<U>(fn: (value: T) => U): Chain<U>;
+  /** Chains a side-effect. Returns the original Chain wrapper. */
+  tap(fn: (value: T) => void): Chain<T>;
+  /** Logs the current value and returns the same Chain wrapper. */
+  log(prefix?: string): Chain<T>;
+  /** Returns the underlying value. Throws the captured error if one occurred. */
+  unwrap(): T;
+};
+
+/** The "magic" wrapper type. */
 export type Chain<T> =
-  // 1. If the value is a function, the wrapper is callable.
-  // deno-lint-ignore no-explicit-any
-  & (T extends (...args: any[]) => any
-    ? (...args: Parameters<T>) => Chain<ReturnType<T>>
-    : unknown)
-  // 2. Map existing properties of T to Chain versions.
-  & { [K in keyof T]: Chain<T[K]> }
-  // 3. Utility methods.
-  & {
-    /** Returns the underlying value if no error occurred, otherwise returns the fallback. */
-    or(fallback: T): T;
-    /** Returns the underlying value or exits the process with the given message if an error occurred. */
-    must(msg: string, verbose?: boolean): Chain<T>;
-    /** Returns the underlying value or exits the process with the given message if an error occurred. Terminal. */
-    expect(msg: string, verbose?: boolean): T;
-    /** Chains a transformation function. */
-    pipe<U>(fn: (value: T) => U): Chain<U>;
-    /** Chains a side-effect. Returns the original Chain wrapper. */
-    tap(fn: (value: T) => void): Chain<T>;
-    /** Logs the current value and returns the same Chain wrapper. */
-    log(prefix?: string): Chain<T>;
-    /** Returns the underlying value. Throws the captured error if one occurred. */
-    unwrap(): T;
-  };
+  & (IsAny<T> extends true ? {
+      // deno-lint-ignore no-explicit-any
+      (...args: any[]): Chain<any>;
+      // deno-lint-ignore no-explicit-any
+      [K: string]: Chain<any>;
+      // deno-lint-ignore no-explicit-any
+    } & { [K in keyof NativeFunction]: Chain<any> }
+    :
+      & (T extends (...args: infer A) => infer R ?
+          & ((...args: A) => Chain<R>)
+          & {
+            [K in keyof NativeFunction]: Chain<(T & NativeFunction)[K]>;
+          }
+        : unknown)
+      & (T extends null | undefined ? unknown : {
+        [K in keyof T as K extends keyof ChainUtils<T> ? never : K]: Chain<
+          T[K]
+        >;
+      }))
+  & ChainUtils<T>;
 
 /**
  * Wraps a value in a safe proxy for error-tolerant chaining.
