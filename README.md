@@ -57,7 +57,7 @@ console.log(`Port: ${port}`);
 **Traditional `if` checks:**
 
 ```typescript
-const user = await fetchUser(1);
+const user = await Promise.resolve({ profile: { getName: () => "user" } });
 let name = "Anonymous";
 
 if (user && user.profile && user.profile.getName) {
@@ -73,7 +73,7 @@ if (user && user.profile && user.profile.getName) {
 
 ```typescript
 import { _ } from "@sigma/chain";
-
+const user: any = null;
 const name = _(user)
   .profile
   .getName()
@@ -104,8 +104,9 @@ console.log(result); // 2
 ### Advanced Chaining
 
 ```typescript
+import { _ } from "@sigma/chain";
 _("some_input")
-  .pipe(processInput)
+  .pipe((x) => x)
   .tap((val) => console.log("Current state:", val))
   .someMethod()
   .log("After method")

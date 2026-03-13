@@ -1,9 +1,5 @@
 import { _, ChainAssertionError } from "../mod.ts";
-import {
-  assertEquals,
-  assertRejects,
-  assertThrows,
-} from "jsr:@std/assert@1.0.19";
+import { assertEquals, assertRejects, assertThrows } from "@std/assert";
 
 Deno.test("must() throws ChainAssertionError", () => {
   // must() on sync failure throws immediately because it accesses the value
