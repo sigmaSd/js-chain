@@ -6,6 +6,15 @@ import process from "node:process";
 
 type IsAny<T> = 0 extends (1 & T) ? true : false;
 
+/** Internal symbol to identify Chain instances. */
+export const IS_CHAIN = Symbol.for("@sigma/chain/isChain");
+
+/** Returns true if the value is a Chain wrapper. */
+export function isChain(val: any): val is Chain<any> {
+  return !!val && (typeof val === "object" || typeof val === "function") &&
+    (val as any)[IS_CHAIN] === true;
+}
+
 /** Utility methods for the Chain wrapper. */
 export type ChainUtils<T> = {
   /** Returns the underlying value if no error occurred, otherwise returns the fallback. */
@@ -48,7 +57,8 @@ export type Chain<T> =
       : T extends Promise<any> ?
           & {
             [
-              K in keyof Awaited<T> as K extends keyof ChainUtils<any> ? never
+              K in keyof Awaited<T> as K extends
+                (keyof ChainUtils<any> | symbol) ? never
                 : K
             ]: Chain<Promise<Awaited<T>[K]>>;
           }
@@ -65,10 +75,13 @@ export type Chain<T> =
           : unknown)
         & {
           [
-            K in keyof Awaited<T> as K extends keyof ChainUtils<any> ? never : K
+            K in keyof Awaited<T> as K extends (keyof ChainUtils<any> | symbol)
+              ? never
+              : K
           ]: Chain<Awaited<T>[K]>;
         }
         & { [K: string]: Chain<any> } // Fallback for magic navigation
+        & { [K: symbol]: any } // Allow raw symbol access
   );
 
 /**
@@ -76,14 +89,23 @@ export type Chain<T> =
  */
 export function _<T>(value: T, error?: unknown): Chain<T> {
   const isPromise = value instanceof Promise;
-  const hasError = !isPromise &&
-    (error !== undefined || value === undefined || value === null);
+  const hasValue = value !== undefined && value !== null;
+  // A chain is considered "failed" if it has no value (is null/undefined).
+  // This affects or().
+  const isFailed = !hasValue;
+  // unwrap() should throw if there is ANY error or no value.
+  const hasAnyError = error !== undefined || !hasValue;
 
   // Use a dummy function as the target to make the Proxy callable.
   const target = (() => {}) as unknown as Chain<T>;
 
   return new Proxy(target, {
     get(_target, prop) {
+      if (prop === IS_CHAIN) return true;
+      if (typeof prop === "symbol") {
+        return (value as any)?.[prop];
+      }
+
       if (prop === "or") {
         return (fallback: any) => {
           if (isPromise) {
@@ -92,7 +114,7 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
             )
               .catch(() => fallback);
           }
-          return hasError ? fallback : value;
+          return isFailed ? fallback : value;
         };
       }
       if (prop === "unwrap") {
@@ -105,7 +127,7 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
               return v;
             });
           }
-          if (hasError) {
+          if (hasAnyError) {
             if (error) throw error;
             throw new Error("Value is null or undefined");
           }
@@ -129,7 +151,7 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
               }),
             );
           }
-          if (hasError) {
+          if (hasAnyError) {
             console.error(`\x1b[31m${msg}\x1b[0m`);
             if (verbose && error) console.error(error);
             process.exit(1);
@@ -152,7 +174,7 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
               process.exit(1);
             });
           }
-          if (hasError) {
+          if (hasAnyError) {
             console.error(`\x1b[31m${msg}\x1b[0m`);
             if (verbose && error) console.error(error);
             process.exit(1);
@@ -169,12 +191,12 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
               }),
             );
           }
-          if (hasError) return _(undefined as unknown as U, error);
+          if (hasAnyError) return _(undefined as unknown as U, error);
           try {
             const next = fn(value);
             return _(next);
-          } catch (error) {
-            return _(undefined as unknown as U, error);
+          } catch (err) {
+            return _(undefined as unknown as U, err);
           }
         };
       }
@@ -183,43 +205,54 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
           if (isPromise) {
             return _(
               (value as Promise<any>).then(async (v) => {
-                await fn(v);
-                return v;
+                try {
+                  await fn(v);
+                  return v;
+                } catch (err) {
+                  throw err;
+                }
+              }).catch((err) => {
+                throw err;
               }),
             );
           }
-          if (hasError) return _(value, error);
+          if (error !== undefined) return _(value, error);
+          if (!hasValue) return _(value, error);
           try {
             const res = fn(value) as any;
             if (res instanceof Promise) {
-              return _(res.then(() => value));
+              return _(
+                res.then(() => value).catch((err) => {
+                  throw err;
+                }),
+              );
             }
             return _(value);
-          } catch (error) {
-            return _(undefined as unknown as T, error);
+          } catch (err) {
+            return _(value, err); // Preserve value
           }
         };
       }
       if (prop === "log") {
         return (prefix?: string) => {
+          const p = prefix ? `${prefix} ` : "";
           if (isPromise) {
             return _(
               (value as Promise<any>).then((v) => {
-                console.log(`${prefix ?? ""}[Value]:`, v);
+                console.log(`${p}[Value]:`, v);
                 return v;
               }).catch((err) => {
-                console.log(`${prefix ?? ""}[Error]:`, err);
+                console.log(`${p}[Error]:`, err);
                 throw err;
               }),
             );
           }
-          if (hasError) {
-            console.log(
-              `${prefix ?? ""}[Error]:`,
-              error ?? "value is null/undefined",
-            );
+          if (error !== undefined) {
+            console.log(`${p}[Error]:`, error);
+          } else if (value === null || value === undefined) {
+            console.log(`${p}[Empty]:`, value);
           } else {
-            console.log(`${prefix ?? ""}[Value]:`, value);
+            console.log(`${p}[Value]:`, value);
           }
           return _(value, error);
         };
@@ -241,7 +274,7 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
         );
       }
 
-      if (hasError) {
+      if (hasAnyError) {
         return _(
           undefined as unknown as T,
           error ??
@@ -256,8 +289,8 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
       try {
         const next = (value as any)[prop];
         return typeof next === "function" ? _(next.bind(value)) : _(next);
-      } catch (error) {
-        return _(undefined as unknown as T, error);
+      } catch (err) {
+        return _(undefined as unknown as T, err);
       }
     },
 
@@ -272,7 +305,7 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
           }),
         );
       }
-      if (hasError) {
+      if (hasAnyError) {
         return _(
           undefined as unknown as T,
           error ??
@@ -283,8 +316,8 @@ export function _<T>(value: T, error?: unknown): Chain<T> {
       }
       try {
         return _((value as any)(...args));
-      } catch (error) {
-        return _(undefined as unknown as T, error);
+      } catch (err) {
+        return _(undefined as unknown as T, err);
       }
     },
   }) as Chain<T>;

@@ -1,11 +1,37 @@
 // deno-lint-ignore-file no-explicit-any
 import { assertEquals, assertThrows } from "jsr:@std/assert@1.0.19";
-import { _ } from "./mod.ts";
+import { _, IS_CHAIN, isChain } from "./mod.ts";
+
+Deno.test("isChain() type guard", () => {
+  const wrapped = _({ a: 1 });
+  assertEquals(isChain(wrapped), true);
+  assertEquals((wrapped as any)[IS_CHAIN], true);
+  assertEquals(isChain({ a: 1 }), false);
+  assertEquals(isChain(null), false);
+  assertEquals(isChain(undefined), false);
+});
 
 Deno.test("Safe property access - success", () => {
   const obj = { a: { b: { c: 1 } } };
   const result = _(obj).a.b.c.unwrap();
   assertEquals(result, 1);
+});
+
+Deno.test("Symbol handling", () => {
+  const sym = Symbol("test");
+  const obj = { [sym]: 42 };
+  const result = _(obj)[sym];
+  // Symbols are returned raw now to support built-in JS behaviors like toPrimitive
+  assertEquals(result, 42);
+
+  // Test Symbol.toPrimitive which is often called by JS engine
+  const obj2 = {
+    [Symbol.toPrimitive](hint: string) {
+      if (hint === "number") return 10;
+      return null;
+    },
+  };
+  assertEquals(Number(_(obj2)), 10);
 });
 
 Deno.test("Safe property access - failure (null/undefined)", () => {
@@ -76,19 +102,24 @@ Deno.test("tap() executes side effect and returns same wrapper", () => {
   assertEquals(result, 10);
 });
 
-Deno.test("tap() catches errors and continues as failed", () => {
+Deno.test("tap() catches errors and preserves value", () => {
   const result = _(10)
     .tap((_n: number) => {
       throw new Error("Tap Error");
-    })
-    .or(0);
-  assertEquals(result, 0);
+    });
+
+  // Value should still be 10
+  assertEquals(result.or(0), 10);
+  // But unwrap should throw the Tap Error
+  assertThrows(() => result.unwrap(), Error, "Tap Error");
 });
 
-Deno.test("log() does not throw", () => {
-  // Should not throw even if value is null
-  _<null>(null).log("Test");
-  _({ a: 1 }).log("Test");
+Deno.test("log() does not throw and handles different states", () => {
+  // Should not throw
+  _<null>(null).log("Null value");
+  _({ a: 1 }).log("Object value");
+  const err = new Error("Logged Error");
+  _(undefined, err).log("Error state");
 });
 
 Deno.test("Regression: 'name' property on any result (like JSON.parse)", () => {
