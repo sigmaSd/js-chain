@@ -11,13 +11,15 @@ export type Safe<T> =
     /** Returns the underlying value if no error occurred, otherwise returns the fallback. */
     or(fallback: T): T;
     /** Returns the underlying value or exits the process with the given message if an error occurred. */
-    must(msg: string): T;
+    must(msg: string): Safe<T>;
     /** Chains a transformation function. */
     pipe<U>(fn: (val: T) => U): Safe<U>;
     /** Chains a side-effect. Returns the original Safe wrapper. */
     tap(fn: (val: T) => void): Safe<T>;
     /** Logs the current value and returns the same Safe wrapper. */
     log(prefix?: string): Safe<T>;
+    /** Returns the underlying value. Throws the captured error if one occurred. */
+    unwrap(): T;
   };
 
 /**
@@ -37,7 +39,18 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
         return (fallback: T) => isErr ? fallback : val;
       }
 
-      // 2. Terminal: Exit on failure
+      // 2. Terminal: Extract value or throw
+      if (prop === "unwrap") {
+        return () => {
+          if (isErr) {
+            if (error) throw error;
+            throw new Error("Value is null or undefined");
+          }
+          return val;
+        };
+      }
+
+      // 3. Chain: Exit on failure
       if (prop === "must") {
         return (msg: string) => {
           if (isErr) {
@@ -45,11 +58,11 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
             if (error) console.error(error);
             Deno.exit(1);
           }
-          return val;
+          return _(val);
         };
       }
 
-      // 3. Chain: Custom transformation
+      // 4. Chain: Custom transformation
       if (prop === "pipe") {
         return <U>(fn: (v: T) => U) => {
           if (isErr) return _(undefined as unknown as U, error);
@@ -90,7 +103,17 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
       }
 
       // 6. Chain: Property access
-      if (isErr) return _(undefined as unknown as T, error);
+      if (isErr) {
+        return _(
+          undefined as unknown as T,
+          error ??
+            new TypeError(
+              `Cannot read properties of ${
+                val === null ? "null" : "undefined"
+              } (reading '${String(prop)}')`,
+            ),
+        );
+      }
 
       try {
         // deno-lint-ignore no-explicit-any
@@ -103,7 +126,15 @@ export function _<T>(val: T, error?: unknown): Safe<T> {
     },
 
     apply(_target, _thisArg, args) {
-      if (isErr) return _(undefined as unknown as T, error);
+      if (isErr) {
+        return _(
+          undefined as unknown as T,
+          error ??
+            new TypeError(
+              `${val === null ? "null" : "undefined"} is not a function`,
+            ),
+        );
+      }
       try {
         // deno-lint-ignore no-explicit-any
         return _((val as any)(...args));
