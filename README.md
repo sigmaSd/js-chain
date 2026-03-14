@@ -1,10 +1,12 @@
 # @sigma/chain
 
-A "magic" wrapper for safe navigation, error handling, and functional chaining
-in TypeScript.
+A wrapper for error-tolerant property traversal, exception capturing, and
+continuous functional chaining in TypeScript.
 
-Inspired by the safe navigation operator (`?.`) but extended to handle errors,
-fallbacks, and functional transformations in a single chain.
+It allows you to access deep object properties, execute methods, and apply
+transformations without breaking the chain if an error occurs or a value is
+missing. Instead of throwing exceptions or crashing, it absorbs failures and
+lets you provide graceful fallbacks.
 
 ## Features
 
